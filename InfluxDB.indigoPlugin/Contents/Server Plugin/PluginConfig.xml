@@ -17,8 +17,7 @@
            tooltip="Port, default 8086">
         <Label>Port:</Label>
     </Field>
-    <Field id="user"
-           type="textfield"
+    <Field id="user" type="textfield"
            defaultValue="indigo"
            tooltip="user name for indigo posting">
         <Label>User:</Label>
@@ -36,6 +35,28 @@
            tooltip="database name in influx">
         <Label>Database:</Label>
     </Field>
+      <Field type="menu" id="ddlMode" defaultValue="include">
+        <Label>Login Method:</Label>
+        <List>
+          <Option value="include">Include only specific properties/states</Option>
+          <Option value="exclude">Include all excluding specific properties/states</Option>
+        </List>
+      </Field>
+
+      <Field id="txtGlobalInclude" visibleBindingId="ddlMode" visibleBindingValue="include"
+              type="textfield" defaultValue="state.onOffState, state.hvac_state, onState, energyCurLevel, energyAccumTotal, value.num, sensorValue, coolSetpoint, heatSetpoint">
+          <Label>Include globally:</Label>
+      </Field>
+
+      <Field id="txtGlobalExclude" visibleBindingId="ddlMode" visibleBindingValue="exclude"
+              type="textfield">
+          <Label>Exclude globally:</Label>
+      </Field>
+
+      <Field id="txtMinimumUpdateFrequency" type="textfield" defaultValue="60">
+          <Label>Minimum update frequency (seconds):</Label>
+      </Field>
+
     <Field id="debug"
            type="checkbox">
         <Label>Debug to Log</Label>

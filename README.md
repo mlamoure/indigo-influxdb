@@ -1,7 +1,7 @@
 Indigo Plug-Ins for InfluxDB and Kafka
 ---
 
-Indigo Plug-In for writing JSON to InfluxDB 
+Indigo Plug-In for writing JSON to InfluxDB
 
 Before starting
 ---
@@ -18,76 +18,21 @@ Configure Indigo
 * Configure the hostname/user/pass/ports etc. For me the defaults for the local system are already set.
 * go get a drink, turning switches on and off along the way, setting off motion sensors, opening doors, and generally being disruptive. 
 
-But I don't have Influx or Grafana
+Additional features added since smurfless1's original plugin
 ---
 
-There are lots of ways to make it work. Luckily homebrew is awesome for the rest of us. 
+* Added ability to include only specific properties / states, or exclude.
 
-* Install homebrew : https://brew.sh
+For include only specific properties/states mode, you can add global properties in the plugin configuration to include for all devices.  The default value contains the most common items.  To add others on a per device basis, use the Indigo Global Property Manager and add a property called "influxIncStates".  Add fields that you want separating them with a comma.  Alternatively, add "all" and all properties will be added.
 
-```
-# use https://github.com/Homebrew/homebrew-services
-brew tap homebrew/services
-```
+For exclude mode, it works exactly the opposite.  All device properties and states will be sent to Influx, except those that you exclude.  To exclude on a per device basis, use Indigo Global Property Manager and add a property called "influxExclStates" with a list of fields that you want, separating by a comma.  Or, use the "all" keyword.
 
-Install InfluxDB on my mac
+* Added minimum update frequency option, so that devices and variables that do not get updated frequently will still get a value sent to InfluxDB occasionally
+* Automatic updates
+
+
+Still to do
 ---
-
-```
-brew install influxdb
-```
-
-Did it work?
-
-```
-which influx && echo "Installed!"
-which influx && brew services start influxdb
-```
-
-Teach influx that I'm going to be putting things in from indigo. The plugin creates the database if required. Just need a user. Copy-paste the next 4 lines all at once and hit return after the EOF line
-
-```
-influx <<EOF
-CREATE USER indigo WITH PASSWORD 'indigo'
-GRANT ALL PRIVILEGES TO indigo
-EOF
-```
-
-Check the installation:
-
-```
-alias indigoinflux="influx -host localhost -port 8086 -username indigo -password indigo -database indigo"
-indigoinflux -execute 'select * from device_changes'
-# no error, no output - after all, I just created it
-
-indigoinflux -execute 'select * from device_changes' | wc -l
-```
-
-Anything bigger than about 2 shows data is going in. WIN! If not, check the indigo log for hints, suspect user name/password, the port, newer versions of indigo than I wrote this for, needing a different version of the python modules, etc.
-
-Install Grafana on my mac
----
-
-```
-brew install grafana
-brew services start grafana
-```
-
-Boostrap: user admin pass admin - they really need to tell you that better from the brew install.
-
-```
-open http://localhost:3000
-```
-
-Use the "login" tab.  Create whatever users, passwords, and logins you want. Since I plan to visit Grafana from other systems, I learned not to use localhost as the data source hostname - use IP, bonjour name (something.local.), or resolvable hostname. Use the "proxy" option, it's not what I expected, it makes the server do all the work. Start creating dashboards. which I'm not good at apparently. They have docs, I have them open a lot. 
-
-To see the raw data:
-
-```
-indigoinflux -execute 'select * from device_changes' > /tmp/raw_device_data.txt
-vim /tmp/raw_device_data.txt
-```
-
-In vim, ```:set nowrap``` so it's more table-ish
-
-
+* "all" not yet implemented
+* Smarter validation of minimum update frequency
+* Minimum update frequency for variables
