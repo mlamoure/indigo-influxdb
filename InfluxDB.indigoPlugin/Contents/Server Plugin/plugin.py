@@ -16,7 +16,7 @@
 #
 import indigo
 import time as time_
-from datetime import datetime, date
+import datetime
 import json
 from indigo_adaptor import IndigoAdaptor
 from influxdb import InfluxDBClient
@@ -33,8 +33,11 @@ class Plugin(indigo.PluginBase):
 		self.connection = None
 		self.adaptor = IndigoAdaptor()
 		self.folders = {}
-		self.pollingInterval = int(pluginPrefs.get("txtMinimumUpdateFrequency", DEFAULT_POLLING_INTERVAL))
+		self.miniumumUpdateFrequency = int(pluginPrefs.get("txtMinimumUpdateFrequency", DEFAULT_POLLING_INTERVAL))
+		self.pollingInterval = 60
+
 		self.mode = pluginPrefs.get("ddlMode")
+		self.debug = pluginPrefs.get("debug", False)
 
 		try:
 			if self.mode == "include":
@@ -46,7 +49,9 @@ class Plugin(indigo.PluginBase):
 
 		self.updater = GitHubPluginUpdater(self)
 		self.updater.checkForUpdate(str(self.pluginVersion))
-		self.lastUpdateCheck = datetime.now()
+		self.lastUpdateCheck = datetime.datetime.now()
+		self.varUpdateCheck = []
+		self.devUpdateCheck = []
 
 	def checkForUpdates(self):
 		self.updater.checkForUpdate()
@@ -94,8 +99,8 @@ class Plugin(indigo.PluginBase):
 			}
 		]
 
-		if self.pluginPrefs.get(u'debug', False):
-			indigo.server.log(json.dumps(json_body).encode('utf-8'))
+#		if self.pluginPrefs.get(u'debug', False):
+#			indigo.server.log(json.dumps(json_body).encode('utf-8'))
 
 		# don't like my types? ok, fine, what DO you want?
 		retrylimit = 30
@@ -144,12 +149,7 @@ class Plugin(indigo.PluginBase):
 			while True:
 				try:
 					if self.connected:
-						for dev in indigo.devices:
-							if dev.lastChanged + datetime.timedelta(seconds=self.pollingInterval) < datetime.datetime.now():
-								self.influxDevice(dev, dev, True)
-
-						for var in indigo.variables:
-							self.influxVariable(var)
+						self.updateAll()
 
 				except:
 					pass
@@ -158,6 +158,58 @@ class Plugin(indigo.PluginBase):
 
 		except self.StopThread:
 			self.logger.debug("Received StopThread")
+
+	def updateAll(self):
+		if self.debug:
+			self.logger.debug("running Update All")
+
+		for dev in indigo.devices:
+			needsUpdating = False
+			found = False
+
+			for devSearch in self.devUpdateCheck:
+				if devSearch[0] == dev.name:
+					found = True
+
+					if devSearch[1] + datetime.timedelta(seconds=self.miniumumUpdateFrequency) < datetime.datetime.now():
+						if self.debug:
+							indigo.server.log("minimum update frequency for device expired: " + dev.name)
+
+						needsUpdating = True
+						devSearch[1] = datetime.datetime.now()
+
+					break
+
+			if not found:
+				self.devUpdateCheck.append([dev.name, dev.lastChanged])
+
+			if needsUpdating:
+				self.influxDevice(dev, dev, True)
+
+		for var in indigo.variables:
+			needsUpdating = False
+			found = False
+
+			for varSearch in self.varUpdateCheck:
+				if varSearch[0] == var.name:
+					found = True
+
+					if varSearch[1] + datetime.timedelta(seconds=self.miniumumUpdateFrequency) < datetime.datetime.now():
+						if self.debug:
+							indigo.server.log("minimum update frequency for variable expired: " + var.name)
+
+						needsUpdating = True
+						varSearch[1] = datetime.datetime.now()
+
+					break
+
+			if not found:
+				self.varUpdateCheck.append([var.name, datetime.datetime.now()])
+
+			if needsUpdating:
+				self.influxVariable(var)
+
+		
 
 
 	def startup(self):
@@ -173,6 +225,8 @@ class Plugin(indigo.PluginBase):
 			indigo.server.log(u'Failed to connect in startup')
 			pass
 
+		self.updateAll()
+
 	# called after runConcurrentThread() exits
 	def shutdown(self):
 		pass
@@ -181,11 +235,22 @@ class Plugin(indigo.PluginBase):
 		# call base implementation
 		indigo.PluginBase.deviceUpdated(self, origDev, newDev)
 
+		found = False
+		for devSearch in self.devUpdateCheck:
+			if devSearch[0] == origDev.name:
+				found = True
+	
+				devSearch[1] = datetime.datetime.now()
+				break
+
+		if not found:
+			self.devUpdateCheck.append([origDev.name, datetime.datetime.now()])
+
 		self.influxDevice(origDev, newDev, False)
 
 	def closedPrefsConfigUi(self, valuesDict, userCancelled):
 		if not userCancelled:
-			self.pollingInterval = int(pluginPrefs.get("txtMinimumUpdateFrequency", DEFAULT_POLLING_INTERVAL))
+			self.miniumumUpdateFrequency = int(valuesDict["txtMinimumUpdateFrequency"])
 			self.mode = valuesDict["ddlMode"]
 
 			try:
@@ -201,6 +266,8 @@ class Plugin(indigo.PluginBase):
 			self.user = valuesDict['user']
 			self.password = valuesDict['password']
 			self.database = valuesDict['database']
+			self.debug = valuesDict["debug"]
+
 
 			self.connect()
 
@@ -217,7 +284,7 @@ class Plugin(indigo.PluginBase):
 		if "com.indigodomo.indigoserver" in origDev.globalProps:
 			if "influxIncStates" in origDev.globalProps["com.indigodomo.indigoserver"] and self.mode == "include":
 				if self.debug:
-					indigo.server.log(u'Adding custom device properties (' + origDev.globalProps["com.indigodomo.indigoserver"]["influxIncStates"] + ") to the include states for device " + newDev.name)
+					indigo.server.log(u'Including custom device properties (' + origDev.globalProps["com.indigodomo.indigoserver"]["influxIncStates"] + ") to the include states for device " + newDev.name)
 
 				includeExcludeStates.append(origDev.globalProps["com.indigodomo.indigoserver"]["influxIncStates"].replace(" ", "").split(","))
 			elif "influxExclStates" in origDev.globalProps["com.indigodomo.indigoserver"] and self.mode == "exclude":
@@ -246,6 +313,17 @@ class Plugin(indigo.PluginBase):
 	def variableUpdated(self, origVar, newVar):
 		indigo.PluginBase.variableUpdated(self, origVar, newVar)
 
+		found = False
+		for varSearch in self.varUpdateCheck:
+			if varSearch[0] == origVar.name:
+				found = True
+	
+				varSearch[1] = datetime.datetime.now()
+				break
+
+		if not found:
+			self.varUpdateCheck.append([origVar.name, datetime.datetime.now()])
+
 		self.influxVariable(newVar)
 
 	def influxVariable(self, var):
@@ -254,7 +332,6 @@ class Plugin(indigo.PluginBase):
 		numval = self.adaptor.smart_value(var.value, True)
 		if numval != None:
 			newjson[u'value.num'] = numval
-
-#		indigo.server.log("sending variable: " + var.name + " value: " + var.value)
+	
 		self.send(tags=newtags, what=newjson, measurement=u'variable_changes')
 

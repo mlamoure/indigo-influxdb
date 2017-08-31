@@ -53,7 +53,7 @@
           <Label>Exclude globally:</Label>
       </Field>
 
-      <Field id="txtMinimumUpdateFrequency" type="textfield" defaultValue="60">
+      <Field id="txtMinimumUpdateFrequency" type="textfield" defaultValue="600">
           <Label>Minimum update frequency (seconds):</Label>
       </Field>
 
