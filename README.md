@@ -29,10 +29,3 @@ For exclude mode, it works exactly the opposite.  All device properties and stat
 
 * Added minimum update frequency option, so that devices and variables that do not get updated frequently will still get a value sent to InfluxDB occasionally
 * Automatic updates
-
-
-Still to do
----
-* "all" not yet implemented
-* Smarter validation of minimum update frequency
-* Minimum update frequency for variables
