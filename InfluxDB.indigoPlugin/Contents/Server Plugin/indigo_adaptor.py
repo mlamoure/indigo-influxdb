@@ -171,6 +171,9 @@ class IndigoAdaptor():
 						hasOneUpdate = True
 
 		if not hasOneUpdate:
+			if self.debug:
+				indigo.server.log("no changed values found for device: " + device.name)
+
 			return None
 			
 		if not device.name in self.cache.keys():

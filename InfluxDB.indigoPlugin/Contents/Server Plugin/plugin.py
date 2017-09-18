@@ -209,7 +209,7 @@ class Plugin(indigo.PluginBase):
 			if needsUpdating:
 				self.influxVariable(var)
 
-		
+
 
 
 	def startup(self):
@@ -235,18 +235,27 @@ class Plugin(indigo.PluginBase):
 		# call base implementation
 		indigo.PluginBase.deviceUpdated(self, origDev, newDev)
 
+		if self.debug:
+			indigo.server.log("An update for device " + origDev.name + " is being processed...")
+
+		device_was_updated = self.influxDevice(origDev, newDev, False)
+
+		if not device_was_updated:
+			if self.debug:
+				indigo.server.log("An update for device " + origDev.name + " resulted in no properties updated...")
+
+			return
+
 		found = False
 		for devSearch in self.devUpdateCheck:
 			if devSearch[0] == origDev.name:
 				found = True
-	
+
 				devSearch[1] = datetime.datetime.now()
 				break
 
 		if not found:
 			self.devUpdateCheck.append([origDev.name, datetime.datetime.now()])
-
-		self.influxDevice(origDev, newDev, False)
 
 	def closedPrefsConfigUi(self, valuesDict, userCancelled):
 		if not userCancelled:
@@ -277,26 +286,47 @@ class Plugin(indigo.PluginBase):
 		includeExcludeStates = []
 
 		if self.mode == "include":
-			includeExcludeStates = self.globalIncludeStates
+			includeExcludeStates = self.globalIncludeStates[:]
 		else:
-			includeExcludeStates = self.globalExcludeStates
+			includeExcludeStates = self.globalExcludeStates[:]
 
 		if "com.indigodomo.indigoserver" in origDev.globalProps:
 			if "influxIncStates" in origDev.globalProps["com.indigodomo.indigoserver"] and self.mode == "include":
 				if self.debug:
 					indigo.server.log(u'Including custom device properties (' + origDev.globalProps["com.indigodomo.indigoserver"]["influxIncStates"] + ") to the include states for device " + newDev.name)
 
-				includeExcludeStates.append(origDev.globalProps["com.indigodomo.indigoserver"]["influxIncStates"].replace(" ", "").split(","))
+				if "," in origDev.globalProps["com.indigodomo.indigoserver"]["influxIncStates"]:
+					includeExcludeStates.append(origDev.globalProps["com.indigodomo.indigoserver"]["influxIncStates"].replace(" ", "").split(","))
+				else:
+					includeExcludeStates.append(origDev.globalProps["com.indigodomo.indigoserver"]["influxIncStates"])
+
+				if self.debug:
+					indigo.server.log("Include list: ")
+					for item in includeExcludeStates:
+						indigo.server.log(item)
+
 			elif "influxExclStates" in origDev.globalProps["com.indigodomo.indigoserver"] and self.mode == "exclude":
 				includeExcludeStates.append(origDev.globalProps["com.indigodomo.indigoserver"]["influxExclStates"].replace(" ", "").split(","))
 
 		# custom add to influx work
 		# tag by folder if present
 		tagnames = u'name folderId'.split()
-		newjson = self.adaptor.diff_to_json(newDev, self.mode, includeExcludeStates, sendPulse)
+
+		if self.mode == "include" and "all" in includeExcludeStates:
+			if self.debug:
+				indigo.server.log("Sending all attributes to be sent for device " + newDev.name)
+
+			newjson = self.adaptor.diff_to_json(newDev, "exclude", [], sendPulse)
+		elif self.mode == "exclude" and "all" in includeExcludeStates:
+			if self.debug:
+				indigo.server.log("Sending NO attributes to be sent to InfluxDB for device " + newDev.name)
+
+			return False
+		else:
+			newjson = self.adaptor.diff_to_json(newDev, self.mode, includeExcludeStates, sendPulse)
 
 		if newjson == None:
-			return
+			return False
 
 		newtags = {}
 		for tag in tagnames:
@@ -310,6 +340,8 @@ class Plugin(indigo.PluginBase):
 		del newjson[u'measurement']
 		self.send(tags=newtags, what=newjson, measurement=measurement)
 
+		return True
+
 	def variableUpdated(self, origVar, newVar):
 		indigo.PluginBase.variableUpdated(self, origVar, newVar)
 
@@ -317,7 +349,7 @@ class Plugin(indigo.PluginBase):
 		for varSearch in self.varUpdateCheck:
 			if varSearch[0] == origVar.name:
 				found = True
-	
+
 				varSearch[1] = datetime.datetime.now()
 				break
 
@@ -332,6 +364,5 @@ class Plugin(indigo.PluginBase):
 		numval = self.adaptor.smart_value(var.value, True)
 		if numval != None:
 			newjson[u'value.num'] = numval
-	
-		self.send(tags=newtags, what=newjson, measurement=u'variable_changes')
 
+		self.send(tags=newtags, what=newjson, measurement=u'variable_changes')
