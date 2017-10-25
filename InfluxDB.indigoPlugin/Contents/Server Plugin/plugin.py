@@ -296,7 +296,8 @@ class Plugin(indigo.PluginBase):
 					indigo.server.log(u'Including custom device properties (' + origDev.globalProps["com.indigodomo.indigoserver"]["influxIncStates"] + ") to the include states for device " + newDev.name)
 
 				if "," in origDev.globalProps["com.indigodomo.indigoserver"]["influxIncStates"]:
-					includeExcludeStates.append(origDev.globalProps["com.indigodomo.indigoserver"]["influxIncStates"].replace(" ", "").split(","))
+					for item in origDev.globalProps["com.indigodomo.indigoserver"]["influxIncStates"].replace(" ", "").split(","):
+						includeExcludeStates.append(item)
 				else:
 					includeExcludeStates.append(origDev.globalProps["com.indigodomo.indigoserver"]["influxIncStates"])
 
@@ -306,7 +307,11 @@ class Plugin(indigo.PluginBase):
 						indigo.server.log(item)
 
 			elif "influxExclStates" in origDev.globalProps["com.indigodomo.indigoserver"] and self.mode == "exclude":
-				includeExcludeStates.append(origDev.globalProps["com.indigodomo.indigoserver"]["influxExclStates"].replace(" ", "").split(","))
+				if "," in origDev.globalProps["com.indigodomo.indigoserver"]["influxExclStates"]:
+					for item in origDev.globalProps["com.indigodomo.indigoserver"]["influxExclStates"].replace(" ", "").split(","):
+						includeExcludeStates.append(item)
+				else:
+					includeExcludeStates.append(origDev.globalProps["com.indigodomo.indigoserver"]["influxExclStates"])
 
 		# custom add to influx work
 		# tag by folder if present
