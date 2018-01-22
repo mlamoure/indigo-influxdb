@@ -36,7 +36,7 @@
         <Label>Database:</Label>
     </Field>
       <Field type="menu" id="ddlMode" defaultValue="include">
-        <Label>Login Method:</Label>
+        <Label>Filter Method:</Label>
         <List>
           <Option value="include">Include only specific properties/states</Option>
           <Option value="exclude">Include all excluding specific properties/states</Option>
